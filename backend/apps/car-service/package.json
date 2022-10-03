@@ -1,7 +1,0 @@
-{
-  "name": "car-service",
-  "version": "1.0.0",
-  "description": "Car microservice",
-  "main": "src/index.ts",
-  "license": "MIT"
-}
