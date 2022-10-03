@@ -1,0 +1,45 @@
+version: '3'
+
+services:
+  opensearch:
+    container_name: opensearch
+    image: opensearchproject/opensearch:1.1.0
+    environment:
+      - node.name=opensearch
+      - cluster.name=fiap-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "DISABLE_SECURITY_PLUGIN=true"
+    ports:
+      - "9200:9200"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - data01:/usr/share/opensearch/data
+
+  localstack:
+    image: 'localstack/localstack:0.13.0'
+    restart: always
+    environment:
+      - AWS_DEFAULT_REGION=sa-east-1
+      - SERVICES=dynamodb,sns,sqs,s3
+    ports:
+      - "4566-4599:4566-4599"
+      - "${PORT_WEB_UI-8080}:${PORT_WEB_UI-8080}"
+    environment:
+      - OPENSEARCH_CUSTOM_BACKEND=http://opensearch:9200
+      - DEBUG=${DEBUG- }
+      - PERSISTENCE=${PERSISTENCE- }
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    depends_on:
+      - opensearch
+    volumes:
+      - ./docker/aws:/docker-entrypoint-initaws.d
+      - "${TMPDIR:-/tmp/localstack}:/tmp/localstack"
+
+volumes:
+  data01:
+    driver: local
