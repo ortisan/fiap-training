@@ -21,11 +21,11 @@ services:
       - data01:/usr/share/opensearch/data
 
   localstack:
-    image: 'localstack/localstack:0.13.0'
+    image: 'localstack/localstack'
     restart: always
     environment:
       - AWS_DEFAULT_REGION=sa-east-1
-      - SERVICES=dynamodb,sns,sqs,s3
+      - SERVICES=dynamodb,kinesis,sns,sqs,s3
     ports:
       - "4566-4599:4566-4599"
       - "${PORT_WEB_UI-8080}:${PORT_WEB_UI-8080}"
