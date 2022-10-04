@@ -11,11 +11,11 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "paths": {
-      "adapter/*": ["./adapters/*"],
-      "cmd/*": ["./cmd/*"],
-      "domain/*": ["./domain/*"],
-      "function/*": ["./function/*"],
-      "usecase/*": ["./usecase/*"]
+      "@adapter/*": ["./adapters/*"],
+      "@cmd/*": ["./cmd/*"],
+      "@domain/*": ["./domain/*"],
+      "@function/*": ["./function/*"],
+      "@usecase/*": ["./usecase/*"]
     }
   }
 }
