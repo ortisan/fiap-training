@@ -6,6 +6,15 @@ configValidationMode: error
 deprecationNotificationMode: error
 
 provider:
+  memorySize: 128
+  name: aws
+  region: us-east-1
+  runtime: nodejs16.x
+  stage: dev
+  versionFunctions: true
+  apiGateway:
+    restApiId: "v3jiicizyb"
+    restApiRootResourceId: "hq2tph0wmj"
   iam:
     role:
       statements:
@@ -14,12 +23,6 @@ provider:
             - lambda:InvokeFunction
           Effect: Allow
           Resource: '*'
-  memorySize: 128
-  name: aws
-  region: us-east-1
-  runtime: nodejs16.x
-  stage: dev
-  versionFunctions: true
 
 plugins:
   - serverless-plugin-typescript

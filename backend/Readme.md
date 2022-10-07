@@ -25,3 +25,14 @@ Na pasta apps/vehicles-service execute o comando:
 ```sh
 serverless invoke local --function post-vehicle
 ```
+
+### Deploy na AWS
+
+1. Configure suas credenciais AWS com o comando
+    ```sh 
+    aws configure
+    ```
+2. Faça o deploy da aplicação:
+    ```sh 
+    serverless deploy
+    ```
