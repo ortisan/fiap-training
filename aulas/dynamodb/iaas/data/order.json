@@ -1,0 +1,7 @@
+{
+  "CustomerId": { "S": "b444d8f9-29cc-4f41-b7a1-aa09fc65552a" },
+  "OrderId": { "S": "711b4b6c-14f6-4cab-a89b-329fffaeb0e2" },
+  "SessionId": { "S": "c47c7be6-9951-4389-9019-b6d9a057126a" },
+  "Price": { "N": "699" },
+  "OrderDate": { "N": "1667334501" }
+}
