@@ -1,6 +1,6 @@
 # DynamoDB
 
-Esse hands on tem o propósito de criar uma tabela e demonstrar as capacidades do DynamoDB.
+Esse hands-on tem o propósito de criar uma tabela e demonstrar as capacidades do DynamoDB.
 
 Veremos as seguintes customizações:
 
@@ -13,6 +13,11 @@ Veremos as seguintes customizações:
 
 1. Instalação do terraform;
 2. Configuração das credenciais aws.
+3. Instalar o pacote npm serverless
+  ```sh
+  npm install -g serverless
+  ```
+
 
 ## Criação do ambiente:
 
@@ -98,6 +103,8 @@ Criaremos alguns alarmes, sendo necessária a confirmação de subscrição conf
     --return-item-collection-metrics SIZE
   ```
 
+## Teste de Alarmes:
+
 Popule os dados de exemplo na tabela:
 
     ```sh
@@ -136,3 +143,20 @@ aws cloudwatch --region us-east-1 set-alarm-state --alarm-name \
   --state-reason "testing" \
   --state-value OK
 ```
+
+# Hands-On Streams
+
+1. Habilite os streams na receita de terraform;
+2. Obtenha o nome do bucke de auditoria. Ele é exibido no output da execução do terraform;
+    ```sh
+    terraform output
+    ```
+3. Altere o arquivo .env com esse valor e faça o deploy da lambda:
+    ```sh
+    sls deploy
+    ```
+4. Crie o trigger no dynamo apontando para a lambda de cdc;
+  ![image](images/dynamodb-subscription.png)
+
+5. Crie, altere ou remova um item e confira os logs e o bucket de auditoria.
+  ![image](images/dynamodb-cdc-audit-bucket.png)

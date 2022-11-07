@@ -5,7 +5,7 @@ resource "aws_dynamodb_table" "orders" {
   write_capacity   = 1
   hash_key         = "CustomerId"
   range_key        = "OrderId"
-  stream_enabled   = false
+  stream_enabled   = true
   stream_view_type = "NEW_AND_OLD_IMAGES"
 
   attribute {
@@ -21,11 +21,6 @@ resource "aws_dynamodb_table" "orders" {
   attribute {
     name = "OrderDate"
     type = "N"
-  }
-
-  ttl {
-    attribute_name = "OrderDate"
-    enabled        = false
   }
 
   point_in_time_recovery {
