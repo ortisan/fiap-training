@@ -21,7 +21,7 @@ const serverlessConfiguration: AWS = {
     environment: {
       AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
       NODE_OPTIONS: "--enable-source-maps --stack-trace-limit=1000",
-      AUDIT_CDC_BUCKET: "env:AUDIT_CDC_BUCKET",
+      AUDIT_CDC_BUCKET: process.env.AUDIT_CDC_BUCKET,
     },
     stackName: "hands-on-dynamodb",
     iam: {
@@ -42,7 +42,7 @@ const serverlessConfiguration: AWS = {
       },
     },
     deploymentBucket: {
-      name: "bucket-deployments-marcelo",
+      name: process.env.DEPLOYMENT_BUCKET,
       serverSideEncryption: "AES256",
     },
   },
