@@ -1,8 +1,17 @@
-# Infraestructure as a Code (IaaC)
+# Infraestructure as Code (IaC)
+
+IaC é o termo dado à ferramentas de provisionamento e gerenciamento de infraestrutura através de código.
+
+Como exemplificado na imagem abaixo, IaC utiliza-se de um arquivo chamado de **template** onde são declarados os recursos de infraestrutura que serão provisionados. Esse template é então processado resultando nos recursos físicos.
+
+![](images/iac.png "IaC")
+
 
 ## CloudFormation
 
-O template de CloudFormation possui a seguinte estrutura:
+CloudFormation é o serviço IaC da AWS. Os recursos lógicos são configurados em um template. O template pode ser escrito em Json ou Yaml.
+
+O template possui a seguinte estrutura:
 
 ```yaml
 AWSTemplateFormatVersion: "version date"
@@ -28,50 +37,126 @@ Resources:
 Outputs:
   set of outputs
 ```
+> AWS Docs: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
 
-### Hands-On - Criando um bucket S3 com CloudFormation (Tempo estimado 30 mins)
+Após o template ser criado, deve-se fazer o upload em algum bucket, e então o CloudFormation utiliza esse template que possui os recursos lógicos, e cria a **Stack**.
 
-Esse HandsOn dará uma visão geral de como o CloudFormation funciona.
+A stack por sua vez, irá criar os recursos físicos.
 
-1. Configurar as credenciais;
+### Hands-On - Criando um EC2 e um bucket S3 Web com CloudFormation (Tempo estimado 30 mins)
 
-2. Efetura o login na AWS;
+Esse Hands-On dará uma visão geral das principais funcionalidades do CloudFormation.
+
+1. Logue na AWS e configure as credenciais do seu user;
+
+    ![](images/sso.png "SSO")
+
+1. Certifique-se de estar na região **us-east-1**;
+
+    ![](images/conta-aws.png "Region")
+
+
+1. Abra a documentação do CloudFormation [S3 resource](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html).
+
+2. Adicione as configurações necessárias para criar um bucket que tenha a configuração de site estático.
+
+3. Valide o template:
+
+    ```sh
+    aws cloudformation validate-template --template-body file://./cloudformation/first-template.yaml
+    ```
 
 3. Ir para o serviço CloudFormation;
 
-4. Executar o comando:
+5. Criar a stack à partir do arquivo template;
 
-    O comando irá criar um bucket através do CloudFormation.
+7. Configurar o parâmetro de nome de bucket, referenciar no Resources. Note que todos os parâmetros declarados no bloco **Parameters** são solicitados;
 
-    ```sh 
-    aws cloudformation create-stack \
-    --stack-name s3-example \
-    --template-body file://./cloudformation/s3-template.yaml \
-    --parameters ParameterKey=BucketName,ParameterValue=my-s3-bucket-111222333
-    ```
+8. Atualizar a stack sobrescrevendo o template com essa nova versão;
 
-5. Listar as stacks no CloudFormation. Alguma foi criada?
+9. E se eu precisar que a url do bucket seja mostrado?
 
-6. Observar os eventos e status;
+10. Configure o Outputs que mostre a url do Bucket, e repita o passo 8.
 
-7. Ir para o S3 e verificar quais buckets foram criados;
+11. Agora eu preciso também criar uma instância ec2, e dependendo do ambiente (DEV ou PROD) eu preciso que o tipo de instância sejam diferentes. No ambiente de dev, utilizarei uma instância **t3.micro** e em prod utilizarei uma instância **t3.medium**.
 
-8. Deletar a stack com o comando:
+12. Abra a documentação de [EC2 Instance](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-instance.html) e [Mappings](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/mappings-section-structure.html);
 
-    ```sh 
-    aws cloudformation delete-stack \
-    --stack-name s3-example
-    ```
-
-10. O S3 foi removido? Caso não foi, qual foi o motivo?
+13. Para obter o id da imagem, liste as imagens EC2 disponíveis na region **us-east-1**.
 
     ```sh
-    aws cloudformation create-stack \
-    --stack-name ec2-example-mappings \
-    --template-body file://./cloudformation/ec2-template-mappings.yaml
+    aws ec2 describe-images --owners self amazon --filters "Name=name,Values=amzn2-ami-kernel-5.10-hvm-2.0.20221103.3-x86_64-gp2"
     ```
 
+14. Adicione as configurações de Mapping para personalizar por ambiente, e repita o passo 8.
+
+15. Se o ambiente for **prod**, eu quero que o bucket seja mantido caso a stack seja deletada.
+
+16. Abra a documentação de [Conditions](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/conditions-section-structure.html)
+
+16. Configure o [Deletion Policy](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-attribute-deletionpolicy.html) do Bucket caso o ambiente seja **prod**.
+
+17. Ao fim do Hands-On, remova a stack.
+
+18. O Bucket foi removido?
+
+Fim
+
+## Terraform
+
+[Terraform](https://www.terraform.io/) é uma ferrramenta IaC da HashCorp. Escrevemos nossos templates na linguagem [HCL](https://developer.hashicorp.com/terraform/language/syntax/configuration), e o terraform interpreta cria e configura os recursos declarados.
+
+Conforme exemplificado abaixo, a grande vantagem do Terraform em relação ao CloudFormation é que o Terraform é Multi-Cloud. Ele pode utilizar-se de um único código para provisionar na AWS, Azure e GCP.
+
+  ![](images/terraform.png "Terraform")
+
+### Hands-On - Criando um S3 Bucket WebSite com Terraform (Tempo estimado 30 mins)
+
+Objetivo desse Hands-On é provisionar um Bucket S3, passando pelos principais componentes do Terraform.
+1. [Instale o Terraform](https://developer.hashicorp.com/terraform/downloads);
+
+1. Instale a [extensão Terraform](https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform) no seu VsCode;
+
+1. Logue na AWS e configure as credenciais do seu user;
+
+    ![](images/sso.png "SSO")
+
+1. Certifique-se de estar na região **us-east-1**;
+
+    ![](images/conta-aws.png "Region")
+
+1. Deixe aberto os seguintes links:
+    - [Terraform Registry AWS](https://registry.terraform.io/providers/hashicorp/aws/4.43.0)
+    - [Resource aws_s3_bucket](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket)
+
+1. Vá para a pasta hands-on-s3:
     ```sh
-     aws cloudformation delete-stack \
-    --stack-name ec2-example-mappings
+    cd hands-on-s3
+    ```
+
+1. Edite os arquivos de acordo com os comentários.
+
+1. Preparar o diretório para os comandos Terraform:
+    ```sh
+    terraform init
+    ```
+1. Validar as configurações dos templates:
+    ```sh
+    terraform validate
+    ```
+1. Formate os templates:
+    ```sh
+    terraform validate
+    ```
+1. Veja o plano de execução:
+    ```sh
+    terraform plan
+    ```
+1. Crie ou atualize a infrastrutura:
+    ```sh
+    terraform apply
+    ```
+1. Ao final, destrua a infraestrutura:
+    ```sh
+    terraform destroy
     ```

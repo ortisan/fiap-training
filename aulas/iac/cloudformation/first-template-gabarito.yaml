@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  BucketName: 
+    Type: String
+    Description: Bucket Name
+  ImageId:
+    Type: String
+    Default: ami-0b0dcb5067f052a63
+  Environment:
+    Type: String
+    AllowedValues: 
+      - "dev"
+      - "prod"
+    Default: "dev"
+
+Mappings:
+  InstanceTypeByEnv:
+    dev: 
+      Value: "t3.micro"
+    prod:
+      Value: "t3.small"
+
+Conditions:
+  IsProd: !Equals [!Ref Environment, "prod"]
+  IsDev: !Not [!Equals [!Ref Environment, "prod"]]
+
+Resources:
+  MyBucketDev:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Ref BucketName
+      WebsiteConfiguration:
+        IndexDocument: index.html
+    DeletionPolicy: "Delete"
+    Condition: IsDev
+    
+  MyBucketProd:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Ref BucketName
+      WebsiteConfiguration:
+        IndexDocument: index.html
+    DeletionPolicy: "Retain"
+    Condition: IsProd
+    
+  MyEC2Instance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !FindInMap [InstanceTypeByEnv, !Ref Environment, "Value"]
+
+Outputs:
+  BucketUrl:
+    Value: !If [IsProd, !GetAtt MyBucketProd.WebsiteURL, !GetAtt MyBucketDev.WebsiteURL]
