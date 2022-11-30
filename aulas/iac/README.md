@@ -164,7 +164,7 @@ Objetivo desse Hands-On é provisionar um Bucket S3, passando pelos principais c
 
 Fim
 
-### Hands-On EC2 + API Node
+### Hands-On EC2 + API Node (Tempo estimado 60 mins)
 
 Esse Hands-On tem o objetivo de provisionar uma instância EC2 com um API Nodejs respondendo "Hello World".
 
