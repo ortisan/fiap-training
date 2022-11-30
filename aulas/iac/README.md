@@ -104,15 +104,16 @@ Fim
 
 ## Terraform
 
-[Terraform](https://www.terraform.io/) é uma ferrramenta IaC da HashCorp. Escrevemos nossos templates na linguagem [HCL](https://developer.hashicorp.com/terraform/language/syntax/configuration), e o terraform interpreta cria e configura os recursos declarados.
+[Terraform](https://www.terraform.io/) é uma ferrramenta IaC da HashCorp. Escrevemos nossos templates na linguagem [HCL](https://developer.hashicorp.com/terraform/language/syntax/configuration), e o Terraform o interpreta, cria, e configura os recursos declarados.
 
-Conforme exemplificado abaixo, a grande vantagem do Terraform em relação ao CloudFormation é que o Terraform é Multi-Cloud. Ele pode utilizar-se de um único código para provisionar na AWS, Azure e GCP.
+Conforme exemplificado abaixo, a grande vantagem do Terraform em relação ao Cloudformation é capacidade de ser Multi-Cloud.
 
   ![](images/terraform.png "Terraform")
 
 ### Hands-On - Criando um S3 Bucket WebSite com Terraform (Tempo estimado 30 mins)
 
 Objetivo desse Hands-On é provisionar um Bucket S3, passando pelos principais componentes do Terraform.
+
 1. [Instale o Terraform](https://developer.hashicorp.com/terraform/downloads);
 
 1. Instale a [extensão Terraform](https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform) no seu VsCode;
@@ -160,3 +161,26 @@ Objetivo desse Hands-On é provisionar um Bucket S3, passando pelos principais c
     ```sh
     terraform destroy
     ```
+
+Fim
+
+### Hands-On EC2 + API Node
+
+Esse Hands-On tem o objetivo de provisionar uma instância EC2 com um API Nodejs respondendo "Hello World".
+
+Algumas das configurações já estâo prontas para melhorar o desenrolar da atividade.
+
+### Arquitetura:
+
+O que faremos:
+
+![](images/hands-on-ec2.png "Hands-On EC2")
+
+1. Provisionaremos toda a camada de segurança com as configurções de IAM e Security Group;
+2. Consultaremos a imagem oficial da Amazon a nossa instância EC2;
+3. Provisionaremos nossa Instância com as configurações:
+  - Atualização dos pacotes linux;
+  - Instalação do NVM e Node;
+  - Construção de um arquivo com o código do servidor (index.js)
+  - Start da nossa aplicação em background;
+4. Por último entraremos na instância EC2 via SSM e faremos alguns testes de curl.
