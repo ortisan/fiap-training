@@ -52,35 +52,22 @@ Esse Hands-On mostrará como é feito um deploy Blue-Green utilizando essas duas
     
     ![Aws Account](images/conta-aws.png "Seleção da Região")
 
-1. Vá para o serviço de API Gateway;
+1. Vá para o serviço Lambda;
+1. Na própria função criada anteriormente, edite o código e acrescente a versão:
 
-1. Na seção REST API, clique em build;
-     ![Version](images/api-gateway-create-1.png "Build REST api")
-
-    > Obs: Diferenças entre HTTP API e Rest API são descritas [aqui](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html);
-
-1. Na seção **Protocol**, selecione **REST**, selecione **New API**, dê um **nome** para a API, selecione o tipo de endpoint **Regional** e clique em **Create API**;
-    ![Version](images/api-gateway-create-2.png "Create REST API")
-
-1. Em **Actions** crie um novo recurso chamado **hello-world**;
-
-1. Crie um método **GET**;
-
-1. Em **Integration Type** selecione **Lambda**, clique em **Use Lambda Proxy Integration**, e por fim coloque a ARN da sua lambda;
-    ![Version](images/api-gateway-create-3.png "Create REST API")
-
-1. Agora em **Actions** faça o deploy da API;
-
-    ![Version](images/api-gateway-create-4.png "Create REST API")
-
-1. Faça um teste de curl para saber se tudo está funcionando corretamente:
-
-    ```sh
-    curl -k -v https://2d606jh5nf.execute-api.us-east-1.amazonaws.com/prod/hello-world
+    ```js
+    exports.handler = async (event) => {
+        console.log(`Event: ${JSON.stringify(event)}`);
+        
+        const response = {
+            statusCode: 200,
+            body: JSON.stringify('Hello from Lambda! V1'),
+        };
+        return response;
+    };
     ```
 
-1. Vá para o serviço Lambda;
-1. Na própria função criada anteriormente, publique a versão atual. Lembrando que versão é imutável.
+1. Publique a versão atual. Lembrando que versão é imutável.
 
     ![Version](images/lambda-version.png "Version")
 1. Verifique a ARN e também se é possível editar o código;
@@ -91,7 +78,7 @@ Esse Hands-On mostrará como é feito um deploy Blue-Green utilizando essas duas
     
     ![Version](images/lambda-alias.png "Version")
 
-1. Faça alguns testes chamando a Lamdba através do comando abaixo:
+1. Faça alguns testes chamando a lamdba através do comando abaixo:
     
     ```sh
     aws lambda invoke \
@@ -100,28 +87,26 @@ Esse Hands-On mostrará como é feito um deploy Blue-Green utilizando essas duas
         response.json && cat response.json
     ```
 
-1. Altere o código para receber o nome no input:
+1. Altere novamente o código alterando a versão:
    
     ```js
-    exports.handler = async (event, context) => {
-        
-        console.log("Event: ",JSON.stringify(event));
-        console.log("Context: ", JSON.stringify(context));
+    exports.handler = async (event) => {
+        console.log(`Event: ${JSON.stringify(event)}`);
         
         const response = {
             statusCode: 200,
-            body: JSON.stringify(`Hello ${event.name}`),
+            body: JSON.stringify('Hello from Lambda! V2'),
         };
-        
         return response;
     };
     ```
+
 1. Faça deploy e execute o teste novamente para certificar que tudo está correto:
     
     ```sh
     aws lambda invoke \
         --function-name HelloWorldMarcelo \
-        --payload '{"name": "Marcelo"}' \
+        --payload '{}' \
         response.json && cat response.json
     ```
 
@@ -129,13 +114,50 @@ Esse Hands-On mostrará como é feito um deploy Blue-Green utilizando essas duas
 
     ![BlueGreen](images/lambda-blue-green.png "BlueGreen Lambda")
 
-11. Teste novamente. Repita o comando, e veja que as duas versões estão recebendo requisições:
+1. Teste novamente. Repita o comando, e veja que as duas versões estão recebendo requisições:
 
     ```sh
     aws lambda invoke \
         --function-name HelloWorldMarcelo:BlueGreen \
-        --payload '{"name": "Marcelo"}' \
+        --payload '{}' \
         response.json && cat response.json
+    ```
+
+1. Agora vamos configurar o deploy canário no **API Gateway**, mas antes, crie dois alias um para a versão 1 chamado **blue**, e um para versão 2 chamado **green**;
+
+1. Vá para o serviço de API Gateway;
+
+1. Na seção REST API, clique em build;
+     ![Rest API](images/api-gateway-create-1.png "Build REST api")
+
+    > Obs: Diferenças entre HTTP API e Rest API são descritas [aqui](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html);
+
+1. Na seção **Protocol**, selecione **REST**, selecione **New API**, dê um **nome** para a API, selecione o tipo de endpoint **Regional** e clique em **Create API**;
+    ![Rest API](images/api-gateway-create-2.png "Create REST API")
+
+1. Em **Actions** crie um novo recurso chamado **hello-world**;
+
+1. Crie um método **GET**;
+
+1. Em **Integration Type** selecione **Lambda**, clique em **Use Lambda Proxy Integration**, e por fim coloque a ARN da sua lambda com o alias dinâmico **HelloWorldMarcelo:${stageVariables.alias}**;
+    ![Rest API](images/api-gateway-create-3.png "Create REST API")
+
+1. Agora em **Actions** faça o deploy da API;
+
+    ![Rest API](images/api-gateway-create-4.png "Create REST API")
+
+1. Selecione o stage e crie uma stage variable chamada **alias** com o valor **blue**;
+
+    ![Rest API](images/api-gateway-create-5.png "Create REST API")
+
+1. Por fim, crie um canary deploy com **Overide Value* configurado com o valor **green**;
+
+    ![Rest API](images/api-gateway-create-6.png "Create REST API")
+
+1. Faça algumas chamadas e verifique o que aconteceu:
+
+    ```sh
+    curl -k -v https://2d606jh5nf.execute-api.us-east-1.amazonaws.com/prod/hello-world
     ```
 
 Fim.
