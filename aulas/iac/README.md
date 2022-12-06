@@ -178,7 +178,7 @@ O que faremos:
 
 1. Provisionaremos toda a camada de segurança com as configurções de IAM e Security Group;
 2. Consultaremos a imagem oficial da Amazon a nossa instância EC2;
-3. Provisionaremos nossa Instância com as configurações:
+3. Provisionaremos nossa instância EC2 com as seguintes configurações:
   - Atualização dos pacotes linux;
   - Instalação do NVM e Node;
   - Construção de um arquivo com o código do servidor (index.js)

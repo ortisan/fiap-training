@@ -20,33 +20,78 @@ Esse Hands-on dará uma visão geral do produto AWS Lambda.
 
     ![Logs](images/lambda-logs.png "Logs Lambda")
 
+7. Coloque um delay dentro da função **handler**. Esse dalay simula uma obtenção de conexão com o banco, ou uma leitura de arquivos de configuração;
+    ```js
+    function delay(milliseconds) {
+        return new Promise(resolve => {
+            setTimeout(resolve, milliseconds);
+        });
+    }
+    ```
+
+8. O que aconteceu?
+
+9. Agora refatore o código e coloque o delay no bloco de inicialização.
+
+10. Os tempos melhoraram ou pioraram. Por quê?
+
 Fim.
 
-## Hands On - Version e Alias (Tempo Estimado 40 mins)
+## Hands On - Version e Alias (Tempo Estimado 60 mins)
 
 Os tipos de deploy Blue-Green e Canário, são ótimas estratégias para mitigar erros que ocorrem em novas versões de software.
+
+Essa estratégia de deploy funciona da seguinte maneira:
 
 As features **Version** e **Alias** são ótimas features para controlar o código que está disponível para ser executado. 
 
 Esse Hands-On mostrará como é feito um deploy Blue-Green utilizando essas duas features. 
 
 1. Faça login na AWS;
-2. Certifique-se de estar na região **us-east-1**;
+1. Certifique-se de estar na região **us-east-1**;
     
     ![Aws Account](images/conta-aws.png "Seleção da Região")
-3. Vá para o serviço Lambda;
-4. Na própria função criada anteriormente, publique a versão atual. Lembrando que versão é imutável.
+
+1. Vá para o serviço de API Gateway;
+
+1. Na seção REST API, clique em build;
+     ![Version](images/api-gateway-create-1.png "Build REST api")
+
+    > Obs: Diferenças entre HTTP API e Rest API são descritas [aqui](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html);
+
+1. Na seção **Protocol**, selecione **REST**, selecione **New API**, dê um **nome** para a API, selecione o tipo de endpoint **Regional** e clique em **Create API**;
+    ![Version](images/api-gateway-create-2.png "Create REST API")
+
+1. Em **Actions** crie um novo recurso chamado **hello-world**;
+
+1. Crie um método **GET**;
+
+1. Em **Integration Type** selecione **Lambda**, clique em **Use Lambda Proxy Integration**, e por fim coloque a ARN da sua lambda;
+    ![Version](images/api-gateway-create-3.png "Create REST API")
+
+1. Agora em **Actions** faça o deploy da API;
+
+    ![Version](images/api-gateway-create-4.png "Create REST API")
+
+1. Faça um teste de curl para saber se tudo está funcionando corretamente:
+
+    ```sh
+    curl -k -v https://2d606jh5nf.execute-api.us-east-1.amazonaws.com/prod/hello-world
+    ```
+
+1. Vá para o serviço Lambda;
+1. Na própria função criada anteriormente, publique a versão atual. Lembrando que versão é imutável.
 
     ![Version](images/lambda-version.png "Version")
-5. Verifique a ARN e também se é possível editar o código;
+1. Verifique a ARN e também se é possível editar o código;
     
     ![Version](images/lambda-version-1.png "Version")
 
-6. Crie um Alias chamado BlueGreen e aponte para essa Versão;
+1. Crie um Alias chamado BlueGreen e aponte para essa Versão;
     
     ![Version](images/lambda-alias.png "Version")
 
-7. Faça alguns testes chamando a Lamdba através do comando abaixo:
+1. Faça alguns testes chamando a Lamdba através do comando abaixo:
     
     ```sh
     aws lambda invoke \
@@ -55,7 +100,7 @@ Esse Hands-On mostrará como é feito um deploy Blue-Green utilizando essas duas
         response.json && cat response.json
     ```
 
-8. Altere o código para receber o nome no input:
+1. Altere o código para receber o nome no input:
    
     ```js
     exports.handler = async (event, context) => {
@@ -71,7 +116,7 @@ Esse Hands-On mostrará como é feito um deploy Blue-Green utilizando essas duas
         return response;
     };
     ```
-9. Faça deploy e execute o teste novamente para certificar que tudo está correto:
+1. Faça deploy e execute o teste novamente para certificar que tudo está correto:
     
     ```sh
     aws lambda invoke \
@@ -80,7 +125,7 @@ Esse Hands-On mostrará como é feito um deploy Blue-Green utilizando essas duas
         response.json && cat response.json
     ```
 
-10. Agora vamos testar o deploy BlueGreen. Para isso, publique uma nova versão e edite o Alias BlueGreen para direcionar 50% de tráfego para a nova versão:
+1. Agora vamos testar o deploy BlueGreen. Para isso, publique uma nova versão e edite o Alias BlueGreen para direcionar 50% de tráfego para a nova versão:
 
     ![BlueGreen](images/lambda-blue-green.png "BlueGreen Lambda")
 

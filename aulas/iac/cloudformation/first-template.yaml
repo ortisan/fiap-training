@@ -1,1 +1,58 @@
 AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: "bucket-marcelo-222222"
+  
+  ImageId:
+    Type: String
+    Default: "ami-0b0dcb5067f052a63"
+
+  Environment:
+    Type: String
+    AllowedValues:
+      - "dev"
+      - "prod"
+    Default: "prod"
+
+Mappings:
+  EvironmentMap: 
+    dev:
+      InstanceType: "t3.micro"
+    prod:
+      InstanceType: "t3.small"
+    
+
+Conditions:
+  IsDev: !Not [!Equals [!Ref Environment, "prod"]]
+  IsProd: !Equals [!Ref Environment, "prod"]
+
+Resources:
+  S3BucketMarceloDev:
+    Type: "AWS::S3::Bucket"
+    DeletionPolicy: Delete
+    Condition: IsDev
+    Properties:
+      BucketName: !Ref BucketName
+      WebsiteConfiguration:
+        IndexDocument: index.html
+  
+  S3BucketMarceloProd:
+    Type: "AWS::S3::Bucket"
+    DeletionPolicy: Retain
+    Condition: IsProd
+    Properties:
+      BucketName: !Ref BucketName
+      WebsiteConfiguration:
+        IndexDocument: index.html
+  
+  MyIntanceEc2:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !FindInMap [EvironmentMap, !Ref Environment, InstanceType]
+
+Outputs:
+  BucketUrl:
+    Value: !If [ IsProd, !GetAtt S3BucketMarceloProd.WebsiteURL, !GetAtt S3BucketMarceloDev.WebsiteURL ]
