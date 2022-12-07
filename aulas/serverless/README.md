@@ -1,8 +1,8 @@
-# Lambda
+# Serverless
 
-Este repositório contém todo o conteúdo de apoio para as aulas de Lambda.
+Este repositório contém todo o conteúdo de apoio para as aulas de Serverless.
 
-## Hands On - Visão Geral (Tempo Estimado 20 mins)
+## Hands On - Visão Geral Lambda (Tempo Estimado 20 mins)
 
 Esse Hands-on dará uma visão geral do produto AWS Lambda.
 
@@ -37,7 +37,7 @@ Esse Hands-on dará uma visão geral do produto AWS Lambda.
 
 Fim.
 
-## Hands On - Version e Alias (Tempo Estimado 60 mins)
+## Hands On - Canary Lambda e Canary API Gateway (Tempo Estimado 60 mins)
 
 Os tipos de deploy Blue-Green e Canário, são ótimas estratégias para mitigar erros que ocorrem em novas versões de software.
 
@@ -161,6 +161,122 @@ Esse Hands-On mostrará como é feito um deploy Blue-Green utilizando essas duas
     ```
 
 Fim.
+
+## Hands On - SNS e SQS (Tempo estimado 60 mins)
+
+Neste Hands On veremos um ecosistema serverless. Utilizaremos API Gateway, Lambda, SNS e SQS.
+
+  ![Hands On SNS SQS](images/sns-sqs.png "SNS + SQS")
+
+1. Faça login na AWS;
+1. Certifique-se de estar na região **us-east-1**;
+    
+    ![Aws Account](images/conta-aws.png "Seleção da Região")
+    
+
+1. Primeiramente, vamos criar os nossos tópicos SNS. Para isso vá no serviço SNS, e crie dois tópicos de acordo com o desenho de arquitetura:
+
+    - Tópico **topic-movimentacao-conta-nome-aluno** - Tópico que receberá eventos de transferência de valores através de Lambda.
+    - Tópico **topic-notificacao-cliente-nome-aluno** - Tópico que notificará o cliente que o valor está saindo da conta.
+
+    ![Tópicos]](images/sns-topics.png "Tópicos")
+
+1. Agora vá para o serviço de SQS e crie a fila de processamento. Essa fila receberá o evento do SNS.
+
+    - Fila **fila-processamento-marcelo-nome-aluno** - Tópico que receberá eventos de transferência de valores através de Lambda.
+
+    ![Fila](images/sqs.png "Filas")
+
+1. Agora a fila precisa sobrescrever o tópico **topic-movimentacao-conta-nome-aluno**, e também precisamos criar uma subscrição no tópico **topic-notificacao-cliente-nome-aluno** para recebermos os emails de notificação.
+
+1. Através da subscrição, o SNS precisará de permissão de escrita na fila. Precisamos portanto adicionar um statement de permissão do SNS no resource policy da Fila
+
+    ```json
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "sns.amazonaws.com"
+      },
+      "Action": "sqs:SendMessage",
+      "Resource": "<ARN DA FILA>",
+      "Condition": {
+        "ArnEquals": {
+          "aws:SourceArn": "<ARN DO TOPICO>"
+        }
+      }
+    }
+    ```
+
+    ![Resource Policy](images/sqs-resource-policy.png "Resource Policy Fila")
+
+1. Vamos evoluir agora as nossas duas lambdas. Obs: Ao criar a lambda, atributa a role **lambda-fiap-default**;
+
+1. O nome dessa lambda será **api-transferencia-nome-aluno**. Ela receberá o post do API Gateway. Obteremos o payload com o **valor**, **conta de origem** e **conta de destino**. A responsabilidade desta lambda é repassar esse evento para o tópico SNS. Note pelo código abaixo que precisaremos configurar a ARN do tópico. Para isso utilizaremos as variáveis de ambiente.
+
+    ```js
+    var AWS = require('aws-sdk');
+    AWS.config.update({region: 'us-east-1'});
+    exports.handler = async (event) => {
+        console.log(JSON.stringify(event));
+        
+        var params = {
+        Message: event.body,
+        TopicArn: process.env.TOPIC_MOVIMENTACAO_CONTA
+        };
+        
+        const data = await new AWS.SNS({apiVersion: '2010-03-31'}).publish(params).promise();
+        console.log("MessageID is " + data.MessageId);
+        
+        const response = {
+            statusCode: 200,
+            body: JSON.stringify('Transferência recebida.'),
+        };
+        return response;
+    };
+    ```
+
+1. A segunda lambda receberá o evento do SNS, formatará uma mensagem e publicará no tópico **topic-notificacao-cliente-nome-aluno**. Atribua o nome de **event-processamento-transferencia-nome-aluno**
+     ```js
+    var AWS = require('aws-sdk');
+    AWS.config.update({region: 'us-east-1'});
+
+    exports.handler = async (event) => {
+        console.log(`Event: ${JSON.stringify(event)}`);
+        console.log(event.Records.length);
+        for (const rec of event.Records) {
+        
+            const transactionDocument = JSON.parse(rec.body);
+            const notificationMessage = `Valor ${transactionDocument.amount} saindo da conta de ${transactionDocument.user_from}, e indo para a conta ${transactionDocument.user_to}`;
+        
+            var params = {
+            Message: notificationMessage,
+            TopicArn: process.env.TOPIC_NOTIFICACAO_CLIENTE
+            };
+            
+            const data = await new AWS.SNS({apiVersion: '2010-03-31'}).publish(params).promise();
+            console.log("MessageID is " + data.MessageId);
+            
+        };
+        return true;
+    };
+    ``` 
+
+1. Vamos criar o no nosso API Gateway com o nome de **transferencia-nome-aluno**. Configure um resource chamado **/transferencias** com method **POST**.
+
+    ![API Gateway](images/api-gateway-transferencia.png "Api Gateway Transferência")
+
+1. Para testar, utilize o comando abaixo:
+
+    ```sh
+    curl --location --request POST 'https://<id-gateway>.execute-api.us-east-1.amazonaws.com/<nome-stage>/transferencia' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "user_from": "marcelo",
+        "user_to": "andre",
+        "amount": 200.0
+    }'
+    ```
+1. Por fim, vamos testar a resiliência. Para isso vamos configurar uma fila DLQ para receber processamentos com erro.
 
 
 ## SAM
