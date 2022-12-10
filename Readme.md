@@ -1,3 +1,3 @@
 # Fiap Training
 
-Código fonte do curso de AWS ministrado à FIAP.
+Materiais de apoio do curso de AWS ministrado à FIAP Corporate.

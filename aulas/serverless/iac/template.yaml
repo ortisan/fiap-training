@@ -1,0 +1,305 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  APIName:
+    Type: String
+    Default: "transfer-api-marcelo"
+  LambdaName:
+    Type: String
+    Default: "api-tranfer"
+  CustomerEmailNotification:
+    Type: String
+
+Resources:
+
+  RoleCloudWatchApi:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - >-
+          arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+
+  AccountTransferApi:
+    Type: 'AWS::ApiGateway::Account'
+    Properties:
+      CloudWatchRoleArn: !GetAtt RoleCloudWatchApi.Arn
+
+  ApiTransfer:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Ref APIName
+      EndpointConfiguration:
+        Types:  
+          - REGIONAL
+
+  DeployTransferApi:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: 
+      - AccountTransferApi
+      - MethodPostTransferApi
+    Properties:
+      RestApiId: !Ref ApiTransfer
+  
+  ProdStageTranferApi:
+    Type: AWS::ApiGateway::Stage
+    DependsOn: AccountTransferApi
+    Properties:
+      StageName: prod
+      RestApiId: !Ref ApiTransfer
+      DeploymentId: !Ref DeployTransferApi
+      MethodSettings:
+        - ResourcePath: "/*"
+          DataTraceEnabled: "true"
+          HttpMethod: "*"
+          LoggingLevel: "INFO"
+
+  ResourceTransferApi:
+    Type: AWS::ApiGateway::Resource
+    Properties: 
+      RestApiId: !Ref ApiTransfer
+      ParentId: !GetAtt ApiTransfer.RootResourceId
+      PathPart: "transfer"
+
+  MethodPostTransferApi:
+    Type: AWS::ApiGateway::Method
+    DependsOn: LambdaApiTransfer
+    Properties:
+      RestApiId: !Ref ApiTransfer
+      ResourceId: !Ref ResourceTransferApi
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub >-
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaApiTransfer.Arn}/invocations
+  
+  ExecutionRoleDefaultLambda:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: lambda-execution-role-transfer
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: '*'
+                Resource: '*'
+        - PolicyName: logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:*
+              Resource: arn:aws:logs:*:*:*
+        - PolicyName: sqs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ChangeMessageVisibility
+              Resource: '*'
+        - PolicyName: sns
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - sns:ListTopics
+              - sns:GetTopicAttributes
+              - sns:Publish
+              Resource: '*'
+      ManagedPolicyArns:
+        - >-
+          arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+ 
+  LambdaPermissionApiGateway:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - ApiTransfer
+      - LambdaApiTransfer
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !Ref LambdaApiTransfer
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join ["", ["arn:aws:execute-api:", !Ref AWS::Region, ":", !Ref AWS::AccountId, ":", !Ref ApiTransfer, "/*"]]
+
+  LambdaApiTransfer:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: api-tranfer-lambda
+      Runtime: nodejs16.x
+      Role: !GetAtt ExecutionRoleDefaultLambda.Arn
+      Handler: index.handler
+      Code:
+        ZipFile: |
+          var AWS = require('aws-sdk');
+          AWS.config.update({region: 'us-east-1'});
+          exports.handler = async (event) => {
+              console.log(`Event: ${JSON.stringify(event)}`);
+              
+              var params = {
+                Message: event.body,
+                TopicArn: process.env.TOPIC_MOVEMENTS_ACCOUNT
+              };
+              
+              const data = await new AWS.SNS({apiVersion: '2010-03-31'}).publish(params).promise();
+              console.log("MessageID is " + data.MessageId);
+              
+              const response = {
+                  statusCode: 200,
+                  body: JSON.stringify('Transferência recebida.'),
+              };
+              return response;
+          };
+      Environment:
+        Variables:
+          TOPIC_MOVEMENTS_ACCOUNT: !Ref TopicMovementsAccount 
+      Description: Transfer api. Redirect message to SNS.
+      TracingConfig:
+        Mode: Active
+  
+  TopicMovementsAccount:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: topic-movements-account
+
+  QueueMovementAccount: 
+    Type: AWS::SQS::Queue
+    Properties: 
+      QueueName: queue-movement-account
+      VisibilityTimeout: 180
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DlqMovementAccount.Arn
+        maxReceiveCount: 3
+  
+  QueuePolicyQueueMovementAccount:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref QueueMovementAccount
+      PolicyDocument:
+        Id: AllowIncomingAccess
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Ref AWS::AccountId
+            Action:
+              - sqs:SendMessage
+              - sqs:ReceiveMessage
+            Resource:
+              - !GetAtt QueueMovementAccount.Arn
+          -
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - sqs:SendMessage
+            Resource:
+              - !GetAtt QueueMovementAccount.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref TopicMovementsAccount
+  
+  DlqMovementAccount:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: queue-movement-account-dlq
+      VisibilityTimeout: 160
+
+  SubscriptionQueueMovementAccount:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref TopicMovementsAccount
+      Endpoint: !GetAtt 
+        - QueueMovementAccount
+        - Arn
+      Protocol: sqs
+      RawMessageDelivery: 'true'
+
+  TopicCustomerNotification:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: topic-customer-notification
+
+  SubscriptionEmailCustomer:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref TopicCustomerNotification
+      Endpoint: !Ref CustomerEmailNotification
+      Protocol: email
+  
+  LambdaEventMovementAccount:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: event-movement-account-lambda
+      Runtime: nodejs16.x
+      Role: !GetAtt ExecutionRoleDefaultLambda.Arn
+      Handler: index.handler
+      Code:
+        ZipFile: |
+          var AWS = require('aws-sdk');
+          AWS.config.update({region: 'us-east-1'});
+
+          exports.handler = async (event) => {
+              console.log(`Event: ${JSON.stringify(event)}`);
+              for (const rec of event.Records) {
+                  const transactionDocument = JSON.parse(rec.body);
+                  const notificationMessage = `Valor ${transactionDocument.amount} saindo da conta de ${transactionDocument.user_from}, e indo para a conta ${transactionDocument.user_to}`;
+                  var params = {
+                    Message: notificationMessage,
+                    TopicArn: process.env.TOPIC_CUSTOMER_NOTIFICATION
+                  };
+                  const data = await new AWS.SNS({apiVersion: '2010-03-31'}).publish(params).promise();
+                  console.log("MessageID is " + data.MessageId);
+              };
+              return true;
+          };
+      Description: Process events of movement account.
+      TracingConfig:
+        Mode: Active
+      Environment:
+        Variables:
+          TOPIC_CUSTOMER_NOTIFICATION: !Ref TopicCustomerNotification 
+
+  EventSourceMappingLambdaEventMovementAccountQueue:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 5
+      Enabled: true
+      EventSourceArn: !GetAtt QueueMovementAccount.Arn
+      FunctionName: !GetAtt LambdaEventMovementAccount.Arn
+
+Outputs:
+  TranferApiRootUrl:
+    Description: Root URL of the Transfer API
+    Value: !Join ["", ["https://", !Ref ApiTransfer, ".execute-api.", !Ref "AWS::Region", ".amazonaws.com"]]
+  
+  
+  
