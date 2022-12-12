@@ -1,0 +1,222 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  transfer-app
+  Transfer Application
+  
+Globals:
+  Function:
+    Timeout: 3
+    Tracing: Active
+  Api:
+    TracingEnabled: True
+
+Parameters:
+  CustomerEmailNotification:
+    Type: String
+
+Resources:
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+
+  ExecutionRoleDefaultLambda:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: lambda-execution-role-transfer
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: '*'
+                Resource: '*'
+        - PolicyName: logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:*
+              Resource: arn:aws:logs:*:*:*
+        - PolicyName: sqs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ChangeMessageVisibility
+              Resource: '*'
+        - PolicyName: sns
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - sns:ListTopics
+              - sns:GetTopicAttributes
+              - sns:Publish
+              Resource: '*'
+      ManagedPolicyArns:
+        - >-
+          arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  LambdaPermissionApiGateway:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - ApiGateway
+      - TransferApiFunction
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !Ref TransferApiFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join ["", ["arn:aws:execute-api:", !Ref AWS::Region, ":", !Ref AWS::AccountId, ":", !Ref ApiGateway, "/*"]]
+  
+  TransferApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/api-transfer/
+      Handler: index.handler
+      Runtime: nodejs16.x
+      Architectures:
+        - x86_64
+      Role: !GetAtt ExecutionRoleDefaultLambda.Arn
+      Events:
+        Function:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /transfer
+            Method: post
+      Environment:
+        Variables:
+          TOPIC_MOVEMENTS_ACCOUNT: !Ref TopicMovementsAccount   
+
+  EventMovementsAccountFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/event-movements-account/
+      Handler: index.handler
+      Runtime: nodejs16.x
+      Architectures:
+        - x86_64
+      Role: !GetAtt ExecutionRoleDefaultLambda.Arn
+      Events:
+        Function:
+          Type: SQS # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            BatchSize: 5
+            Enabled: true
+            MaximumBatchingWindowInSeconds: 5
+            Queue: !GetAtt QueueMovementAccount.Arn
+      Environment:
+        Variables:
+          TOPIC_CUSTOMER_NOTIFICATION: !Ref TopicCustomerNotification 
+
+  TopicMovementsAccount:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: topic-movements-account
+  
+  QueueMovementAccount: 
+    Type: AWS::SQS::Queue
+    Properties: 
+      QueueName: queue-movement-account
+      VisibilityTimeout: 180
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DlqMovementAccount.Arn
+        maxReceiveCount: 3
+  
+  QueuePolicyQueueMovementAccount:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref QueueMovementAccount
+      PolicyDocument:
+        Id: AllowIncomingAccess
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Ref AWS::AccountId
+            Action:
+              - sqs:SendMessage
+              - sqs:ReceiveMessage
+            Resource:
+              - !GetAtt QueueMovementAccount.Arn
+          -
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - sqs:SendMessage
+            Resource:
+              - !GetAtt QueueMovementAccount.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref TopicMovementsAccount
+  
+  DlqMovementAccount:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: queue-movement-account-dlq
+      VisibilityTimeout: 160
+  
+  SubscriptionQueueMovementAccount:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref TopicMovementsAccount
+      Endpoint: !GetAtt 
+        - QueueMovementAccount
+        - Arn
+      Protocol: sqs
+      RawMessageDelivery: 'true'
+
+  TopicCustomerNotification:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: topic-customer-notification
+
+  SubscriptionEmailCustomer:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref TopicCustomerNotification
+      Endpoint: !Ref CustomerEmailNotification
+      Protocol: email
+
+Outputs:
+  TransferApi:
+    Description: "API Gateway endpoint URL for Prod stage for Transfer API"
+    Value: !Join ["", ["https://", !Ref ApiGateway, ".execute-api.", !Ref "AWS::Region", ".amazonaws.com"]]
+  TransferApiFunction:
+    Description: "ARN of Transfer API"
+    Value: !GetAtt TransferApiFunction.Arn
+  EventMovementsAccountFunction:
+    Description: "ARN of Event Movement Function"
+    Value: !GetAtt EventMovementsAccountFunction.Arn
+  TopicMovementsAccount:
+    Description: "ARN of Topic Movements Account"
+    Value: !Ref TopicMovementsAccount
+  QueueMovementAccount:
+    Description: "ARN of Queue Movements Account"
+    Value: !GetAtt EventMovementsAccountFunction.Arn
+  TopicCustomerNotification:
+    Description: "ARN of Topic Customer Notification"
+    Value: !Ref TopicCustomerNotification
+
+    
