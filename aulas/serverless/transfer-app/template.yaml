@@ -9,6 +9,7 @@ Globals:
     Timeout: 3
     Tracing: Active
   Api:
+    OpenApiVersion: 3.0.1 # https://github.com/aws/serverless-application-model/issues/191
     TracingEnabled: True
 
 Parameters:
