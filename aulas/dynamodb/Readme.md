@@ -9,10 +9,12 @@ Veremos as seguintes customizações:
 - *PITR*
 - alarmes
 
+![image](images/dynamodb-handson.png)
+
 ## Pré Requisitos:
 
 1. Instalação do terraform;
-2. Configuração das credenciais aws.
+2. Configuração das credenciais aws;
 3. Instalar o pacote npm serverless
   ```sh
   npm install -g serverless
