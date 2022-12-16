@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "aws-sdk": "^2.1276.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.16.7"
+  }
+}

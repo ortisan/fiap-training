@@ -1,0 +1,13 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "test-app"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-m06wlr8avqhe"
+s3_prefix = "test-app"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+disable_rollback = true
+parameter_overrides = "DynamodbStreamsArn=\"arn:aws:dynamodb:us-east-1:647610929809:table/OrdersMarcelo/stream/2022-12-16T15:45:57.937\" AuditBucketName=\"orders-audity-bucket-20221216154605910600000001\""
+image_repositories = []

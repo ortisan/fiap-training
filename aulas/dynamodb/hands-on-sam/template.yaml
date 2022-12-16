@@ -1,0 +1,134 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  hands-on-app
+
+  Sample SAM Template for hands-on-app
+  
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 3
+    Tracing: Active
+  Api:
+    TracingEnabled: True
+
+Parameters:
+  DynamodbStreamsArn:
+    Type: String
+    Default: arn:aws:dynamodb:us-east-1:647610929809:table/OrdersMarcelo/stream/2022-12-16T15:45:57.937
+  AuditBucketName:
+    Type: String
+    Default: orders-audity-bucket-20221216154605910600000001
+
+Resources:
+  ExecutionRoleDefaultLambda:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: '*'
+                Resource: '*'
+        - PolicyName: logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:*
+              Resource: arn:aws:logs:*:*:*
+        - PolicyName: sqs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ChangeMessageVisibility
+              Resource: '*'
+        - PolicyName: sns
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - sns:ListTopics
+              - sns:GetTopicAttributes
+              - sns:Publish
+              Resource: '*'
+        - PolicyName: dynamodb
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - dynamodb:GetRecords
+              - dynamodb:GetShardIterator
+              - dynamodb:DescribeStream
+              - dynamodb:ListStreams
+              Resource: '*'
+        - PolicyName: s3
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - s3:*
+              Resource: '*'
+              
+      ManagedPolicyArns:
+        - >-
+          arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+
+  CDCAuditFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: cdc-dynamodb-audit/
+      Handler: app.handleStreamEvent
+      Runtime: nodejs16.x
+      Architectures:
+        - x86_64
+      Role: !GetAtt ExecutionRoleDefaultLambda.Arn
+      Events:
+        Stream:
+          Type: DynamoDB
+          Properties:
+            Stream: !Ref DynamodbStreamsArn
+            BatchSize: 100
+            StartingPosition: TRIM_HORIZON
+      Environment:
+        Variables:
+          AUDIT_CDC_BUCKET: !Ref AuditBucketName
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        # Sourcemap: true # Enabling source maps will create the required NODE_OPTIONS environment variables on your lambda function during sam build
+        EntryPoints: 
+        - app.ts
+
+Outputs:
+  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+  CDCAuditFunction:
+    Description: "Hello World Lambda Function ARN"
+    Value: !GetAtt CDCAuditFunction.Arn
