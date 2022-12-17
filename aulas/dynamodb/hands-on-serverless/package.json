@@ -1,5 +1,5 @@
 {
-  "name": "hands-on-project",
+  "name": "hands-on-serverless",
   "version": "1.0.0",
   "description": "HandsOn dynamo project",
   "deploy": "serverless deploy",
@@ -29,7 +29,6 @@
     "serverless": "^3.24.1",
     "serverless-bundle": "^5.5.0",
     "serverless-deployment-bucket": "^1.6.0",
-    "serverless-dotenv-plugin": "^4.0.2",
     "serverless-esbuild": "^1.33.1",
     "serverless-offline": "^11.2.3",
     "serverless-plugin-typescript": "^2.1.4",

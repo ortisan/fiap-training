@@ -39,3 +39,7 @@ resource "aws_dynamodb_table" "orders" {
     Environment = "production"
   }
 }
+
+output "dynamodb_stream_arn" {
+  value = aws_dynamodb_table.orders.stream_arn
+}

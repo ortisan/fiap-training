@@ -1,19 +1,17 @@
+import index from "@functions/cdc-dynamodb-audit";
 import type { AWS } from "@serverless/typescript";
-
-import index from "@functions/cdc-dynamodb";
+import config from "config";
 
 const serverlessConfiguration: AWS = {
   service: "hands-on-dynamodb",
   frameworkVersion: "3",
   plugins: [
     "serverless-esbuild",
-    "serverless-offline",
-    "serverless-dotenv-plugin",
+    "serverless-offline"
   ],
-
   provider: {
     name: "aws",
-    runtime: "nodejs14.x",
+    runtime: "nodejs16.x",
     apiGateway: {
       minimumCompressionSize: 1024,
       shouldStartNameWithService: true,
@@ -21,9 +19,9 @@ const serverlessConfiguration: AWS = {
     environment: {
       AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
       NODE_OPTIONS: "--enable-source-maps --stack-trace-limit=1000",
-      AUDIT_CDC_BUCKET: process.env.AUDIT_CDC_BUCKET,
+      AUDIT_CDC_BUCKET: config.bucketAudit,
     },
-    stackName: "hands-on-dynamodb",
+    stackName: "hands-on-serverless",
     iam: {
       role: {
         statements: [
@@ -46,7 +44,7 @@ const serverlessConfiguration: AWS = {
       serverSideEncryption: "AES256",
     },
   },
-  functions: { "cdc-dynamodb": index },
+  functions: { "cdc-dynamodb-audit": index },
   package: { individually: true },
   custom: {
     esbuild: {
@@ -54,7 +52,7 @@ const serverlessConfiguration: AWS = {
       minify: false,
       sourcemap: true,
       exclude: ["aws-sdk"],
-      target: "node14",
+      target: "node16",
       define: { "require.resolve": undefined },
       platform: "node",
       concurrency: 10,

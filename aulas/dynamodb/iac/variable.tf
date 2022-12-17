@@ -5,7 +5,7 @@ variable "region" {
 
 variable "student_name" {
   type    = string
-  default = "marcelo"
+  default = "marceloortiz"
 }
 
 variable "student_email" {

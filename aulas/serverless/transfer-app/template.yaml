@@ -106,7 +106,7 @@ Resources:
             Method: post
       Environment:
         Variables:
-          TOPIC_MOVEMENTS_ACCOUNT: !Ref TopicMovementsAccount   
+          AUDIT_CDC_BUCKET: !Ref TopicMovementsAccount   
 
   EventMovementsAccountFunction:
     Type: AWS::Serverless::Function

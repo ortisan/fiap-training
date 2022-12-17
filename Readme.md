@@ -6,4 +6,3 @@ Materiais de apoio do curso de AWS ministrado à FIAP Corporate.
 1. [IAC](./aulas/iac/)
 1. [Serverless](./aulas/serverless/)
 1. [DynamoDB](./aulas/dynamodb/)
-

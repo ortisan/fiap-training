@@ -19,6 +19,7 @@ Veremos as seguintes customizações:
   ```sh
   npm install -g serverless
   ```
+4. Instalar o SAM.
 
 
 ## Criação do ambiente:
@@ -105,9 +106,9 @@ Criaremos alguns alarmes, sendo necessária a confirmação de subscrição conf
     --return-item-collection-metrics SIZE
   ```
 
-## Teste de Alarmes:
+## Teste de Alarmes
 
-Popule os dados de exemplo na tabela:
+Nos arquivos abaixo, altere para o nome da sua tabela e execute os comandos para popular a tabela:
 
     ```sh
     aws dynamodb --region us-east-1 batch-write-item \
@@ -149,16 +150,23 @@ aws cloudwatch --region us-east-1 set-alarm-state --alarm-name \
 # Hands-On Streams
 
 1. Habilite os streams na receita de terraform;
-2. Obtenha o nome do bucke de auditoria. Ele é exibido no output da execução do terraform;
+1. Obtenha o nome do bucket de auditoria, e o arn do dynamodb streams. Ele é exibido no output da execução do terraform;
     ```sh
     terraform output
     ```
-3. Altere o arquivo .env com esse valor e faça o deploy da lambda:
-    ```sh
-    sls deploy
-    ```
-4. Crie o trigger no dynamo apontando para a lambda de cdc;
-  ![image](images/dynamodb-subscription.png)
+1. Caso escolha SAM, siga os passos:
+    1. Altere o arquivo **template.yaml** da aplicação de exemplo com esse valor e compile a aplicação e faça o deploy do projeto:
+    
+        ```sh
+        sam build
+        sam deploy --guided
+        ```
+1. Caso escolha Serverless, siga os seguintes passos:
+    1. No arquivo **config.ts**, altere os valores das variáveis do bucket de auditoria e arn do dynamo streams, e execute o comando abaixo:
 
-5. Crie, altere ou remova um item e confira os logs e o bucket de auditoria.
+        ```sh
+        serverless deploy
+        ```
+
+1. Crie, altere ou remova um item e confira os logs e o bucket de auditoria.
   ![image](images/dynamodb-cdc-audit-bucket.png)

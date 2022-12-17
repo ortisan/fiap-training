@@ -1,9 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  hands-on-app
-
-  Sample SAM Template for hands-on-app
+  HandsOn Sam
   
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
@@ -16,10 +14,10 @@ Globals:
 Parameters:
   DynamodbStreamsArn:
     Type: String
-    Default: arn:aws:dynamodb:us-east-1:647610929809:table/OrdersMarcelo/stream/2022-12-16T15:45:57.937
+    Default: arn:aws:dynamodb:us-east-1:647610929809:table/OrdersMarceloortiz/stream/2022-12-17T12:22:01.554
   AuditBucketName:
     Type: String
-    Default: orders-audity-bucket-20221216154605910600000001
+    Default: orders-audity-bucket-20221217122208996400000001
 
 Resources:
   ExecutionRoleDefaultLambda:
@@ -101,10 +99,11 @@ Resources:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
       CodeUri: cdc-dynamodb-audit/
-      Handler: app.handleStreamEvent
+      Handler: app.lambdaHandler
       Runtime: nodejs16.x
       Architectures:
         - x86_64
+      Timeout: 30
       Role: !GetAtt ExecutionRoleDefaultLambda.Arn
       Events:
         Stream:
@@ -121,14 +120,16 @@ Resources:
       BuildProperties:
         Minify: true
         Target: "es2020"
-        # Sourcemap: true # Enabling source maps will create the required NODE_OPTIONS environment variables on your lambda function during sam build
+        Sourcemap: true # Enabling source maps will create the required NODE_OPTIONS environment variables on your lambda function during sam build
         EntryPoints: 
         - app.ts
+        External:
+          - "aws-sdk"
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
   # Find out more about other implicit resources you can reference within SAM
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
   CDCAuditFunction:
-    Description: "Hello World Lambda Function ARN"
+    Description: "CDC Audit Function ARN"
     Value: !GetAtt CDCAuditFunction.Arn
