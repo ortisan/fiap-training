@@ -130,6 +130,8 @@ Resources:
             Method: post
       Environment:
         Variables:
+          SERVICE_NAME: !Sub >-
+            transfer${StudentName}
           TABLE_TRANSFER: !Ref TableTransfer
           TOPIC_TRANSFER_MOVEMENTS: !Ref TopicTransferMovements
     Metadata: # Manage esbuild properties
@@ -326,6 +328,8 @@ Resources:
             Method: put
       Environment:
         Variables:
+          SERVICE_NAME: !Sub >-
+            transfer${StudentName}
           TABLE_ACCOUNT_BALANCE: !Ref TableAccountBalance
     Metadata: # Manage esbuild properties
       BuildMethod: esbuild
@@ -361,6 +365,8 @@ Resources:
             Queue: !GetAtt QueueTransferMovementAccount.Arn
       Environment:
         Variables:
+          SERVICE_NAME: !Sub >-
+            transfer${StudentName}
           TABLE_ACCOUNT_BALANCE: !Ref TableAccountBalance 
           TOPIC_MONEY_MOVEMENT_ACCOUNT: !Ref TopicMoneyMovementAccount 
     Metadata: # Manage esbuild properties
@@ -457,6 +463,8 @@ Resources:
             Queue: !GetAtt QueueMoneyMovementAccount.Arn
       Environment:
         Variables:
+          SERVICE_NAME: !Sub >-
+            transfer${StudentName}
           TABLE_TRANSFER: !Ref TableTransfer
     Metadata: # Manage esbuild properties
       BuildMethod: esbuild

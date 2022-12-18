@@ -1,7 +1,9 @@
+import { Tracer, captureLambdaHandler } from '@aws-lambda-powertools/tracer';
 import { DynamoDB, PutItemCommandInput } from '@aws-sdk/client-dynamodb';
 import { PublishCommandInput, SNS } from '@aws-sdk/client-sns';
+import middy from '@middy/core';
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { IllegalArgumentError, TransferDomain, TransferRequest, errorHandler } from "commons";
+import { IllegalArgumentError, TransferDomain, TransferRequest, errorHandler } from 'commons';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
@@ -14,13 +16,15 @@ const awsRegion = 'us-east-1';
 const dynamodbClient = new DynamoDB({ region: awsRegion });
 const snsClient = new SNS({ region: awsRegion });
 
-export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-    console.log("Received event", JSON.stringify(event));
-    
+const tracer = new Tracer({ serviceName: process.env.SERVICE_NAME });
+
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+    console.log('Received event', JSON.stringify(event));
+
     try {
         const data: TransferRequest = JSON.parse(event.body || '');
 
-        console.log("Data", event.body);
+        console.log('Data', event.body);
 
         const now = dayjs().utc();
         const domain: TransferDomain = {
@@ -30,7 +34,7 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
             accountTo: data.accountTo,
             amount: data.amount,
             date: now.format(),
-            timestamp: now.unix()
+            timestamp: now.unix(),
         };
 
         validate(domain);
@@ -75,7 +79,7 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
                 id: domain.id,
                 details: 'Processing transaction...',
                 date: domain.date,
-                timestamp: domain.timestamp
+                timestamp: domain.timestamp,
             }),
         };
     } catch (err) {
@@ -83,20 +87,23 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
     }
 };
 
+// Wrap the handler with middy
+export const lambdaHandler = middy(handler)
+    // Use the middleware by passing the Tracer instance as a parameter
+    .use(captureLambdaHandler(tracer));
+
 const validate = (domain: TransferDomain) => {
     const errors = [];
     if (!domain.accountFrom) {
-        errors.push("From Account is required.");
+        errors.push('From Account is required.');
     }
     if (!domain.accountTo) {
-        errors.push("To Account is required.");
+        errors.push('To Account is required.');
     }
     if (!domain.amount || domain.amount <= 0) {
-        errors.push("Amount is required and must be grather than zero.");
+        errors.push('Amount is required and must be grather than zero.');
     }
     if (errors.length > 0) {
-        throw new IllegalArgumentError("Transfer request has errros.", errors);
+        throw new IllegalArgumentError('Transfer request has errros.', errors);
     }
-}
-
-
+};
