@@ -1,0 +1,512 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  transfer-saga-pattern
+  Transfer Saga Pattern
+  
+Globals:
+  Function:
+    Timeout: 30
+    Tracing: Active
+  Api:
+    OpenApiVersion: 3.0.1 # https://github.com/aws/serverless-application-model/issues/191
+    TracingEnabled: True
+
+Parameters:
+  StudentName: 
+    Type: String
+    Default: Marcelo
+
+Resources:
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+
+  ExecutionRoleDefaultLambda:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: lambda-execution-role-transfer
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: '*'
+                Resource: '*'
+        - PolicyName: logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:*
+              Resource: arn:aws:logs:*:*:*
+        - PolicyName: sqs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ChangeMessageVisibility
+              Resource: '*'
+        - PolicyName: sns
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - sns:ListTopics
+              - sns:GetTopicAttributes
+              - sns:Publish
+              Resource: '*'
+        - PolicyName: dynamodb
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - dynamodb:PutItem
+              - dynamodb:GetRecords
+              - dynamodb:GetShardIterator
+              - dynamodb:DescribeStream
+              - dynamodb:ListStreams
+              Resource: '*'
+        - PolicyName: s3
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - s3:*
+              Resource: '*'
+      ManagedPolicyArns:
+        - >-
+          arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  LambdaPermissionApiGateway:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - ApiGateway
+      - FunctionTransferApi
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !Ref FunctionTransferApi
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join ["", ["arn:aws:execute-api:", !Ref AWS::Region, ":", !Ref AWS::AccountId, ":", !Ref ApiGateway, "/*"]]
+
+  FunctionTransferApi:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - TableTransfer
+      - TopicTransferMovements
+    Properties:
+      CodeUri: transfer-api/
+      Handler: app.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+        - x86_64
+      Role: !GetAtt ExecutionRoleDefaultLambda.Arn
+      Events:
+        Function:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /transfer
+            Method: post
+      Environment:
+        Variables:
+          TABLE_TRANSFER: !Ref TableTransfer
+          TOPIC_TRANSFER_MOVEMENTS: !Ref TopicTransferMovements
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true # Enabling source maps will create the required NODE_OPTIONS environment variables on your lambda function during sam build
+        EntryPoints: 
+        - app.ts
+        External:
+          - "aws-sdk"
+
+  TableTransfer: 
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName: !Sub >-
+        TransferTable${StudentName}
+      
+      AttributeDefinitions: 
+        - 
+          AttributeName: "id"
+          AttributeType: "S"
+        - 
+          AttributeName: "accountFrom"
+          AttributeType: "S"
+        - 
+          AttributeName: "status"
+          AttributeType: "S"
+        - 
+          AttributeName: "date"
+          AttributeType: "N"
+          
+      KeySchema: 
+        - 
+          AttributeName: "id"
+          KeyType: "HASH"
+        - 
+          AttributeName: "accountFrom"
+          KeyType: "RANGE"
+      
+      ProvisionedThroughput: 
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      
+      GlobalSecondaryIndexes: 
+        - 
+          IndexName: "TransferByStatus"
+          KeySchema: 
+            - 
+              AttributeName: "accountFrom"
+              KeyType: "HASH"
+            - 
+              AttributeName: "status"
+              KeyType: "RANGE"
+          Projection: 
+            ProjectionType: "ALL"
+          ProvisionedThroughput: 
+            ReadCapacityUnits: "5"
+            WriteCapacityUnits: "5"
+        - 
+          IndexName: "TransferByDate"
+          KeySchema: 
+            - 
+              AttributeName: "accountFrom"
+              KeyType: "HASH"
+            - 
+              AttributeName: "date"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput: 
+            ReadCapacityUnits: "5"
+            WriteCapacityUnits: "5"
+
+  TopicTransferMovements:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub >-
+        topicTransferMovementAccount${StudentName}
+
+  QueueTransferMovementAccount: 
+    Type: AWS::SQS::Queue
+    DependsOn:
+      - DlqQueueTransferMovementAccount
+    Properties: 
+      QueueName: !Sub >-
+        queueTransferMovementAccount${StudentName}
+      VisibilityTimeout: 120
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DlqQueueMoneyMovementAccount.Arn
+        maxReceiveCount: 3
+    
+  DlqQueueTransferMovementAccount:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub >-
+        queueTransferMovementAccount${StudentName}DLQ
+      VisibilityTimeout: 120
+
+  QueuePolicyQueueTransferMovementAccount:
+    Type: AWS::SQS::QueuePolicy
+    DependsOn:
+      - QueueTransferMovementAccount
+      - TopicTransferMovements
+    Properties:
+      Queues:
+        - !Ref QueueTransferMovementAccount
+      PolicyDocument:
+        Id: AllowIncomingAccess
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Ref AWS::AccountId
+            Action:
+              - sqs:SendMessage
+              - sqs:ReceiveMessage
+            Resource:
+              - !GetAtt QueueTransferMovementAccount.Arn
+          -
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - sqs:SendMessage
+            Resource:
+              - !GetAtt QueueTransferMovementAccount.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref TopicTransferMovements
+ 
+  SubscriptionQueueTransferMovementAccount:
+    Type: AWS::SNS::Subscription
+    DependsOn : 
+      - TopicTransferMovements
+      - QueueTransferMovementAccount
+    Properties:
+      TopicArn: !Ref TopicTransferMovements
+      Endpoint: !GetAtt 
+        - QueueTransferMovementAccount
+        - Arn
+      Protocol: sqs
+      RawMessageDelivery: 'true'
+
+  TableAccountBalance: 
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName: !Sub >-
+        AccountBalanceTable${StudentName}
+      
+      AttributeDefinitions: 
+        - 
+          AttributeName: "id"
+          AttributeType: "S"
+
+      KeySchema: 
+        - 
+          AttributeName: "id"
+          KeyType: "HASH"
+
+      ProvisionedThroughput: 
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      
+  LambdaPermissionApiGatewayPutAccountBalance:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - ApiGateway
+      - FunctionPutAccountBalanceApi
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !Ref FunctionPutAccountBalanceApi
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join ["", ["arn:aws:execute-api:", !Ref AWS::Region, ":", !Ref AWS::AccountId, ":", !Ref ApiGateway, "/*"]]
+  
+  FunctionPutAccountBalanceApi:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - TableAccountBalance
+    Properties:
+      CodeUri: put-account-balance-api/
+      Handler: app.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+        - x86_64
+      Role: !GetAtt ExecutionRoleDefaultLambda.Arn
+      Events:
+        Function:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /account-balance
+            Method: put
+      Environment:
+        Variables:
+          TABLE_ACCOUNT_BALANCE: !Ref TableAccountBalance
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true # Enabling source maps will create the required NODE_OPTIONS environment variables on your lambda function during sam build
+        EntryPoints: 
+        - app.ts
+        External:
+          - "aws-sdk"
+  
+  FunctionAccountMovementEvent:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - QueueTransferMovementAccount
+      - TableAccountBalance
+      - TopicMoneyMovementAccount
+    Properties:
+      CodeUri: account-movement-event/
+      Handler: app.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+        - x86_64
+      Role: !GetAtt ExecutionRoleDefaultLambda.Arn
+      Events:
+        Function:
+          Type: SQS # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            BatchSize: 5
+            Enabled: true
+            MaximumBatchingWindowInSeconds: 5
+            Queue: !GetAtt QueueTransferMovementAccount.Arn
+      Environment:
+        Variables:
+          TABLE_ACCOUNT_BALANCE: !Ref TableAccountBalance 
+          TOPIC_MONEY_MOVEMENT_ACCOUNT: !Ref TopicMoneyMovementAccount 
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true # Enabling source maps will create the required NODE_OPTIONS environment variables on your lambda function during sam build
+        EntryPoints: 
+        - app.ts
+        External:
+          - "aws-sdk"
+
+  TopicMoneyMovementAccount:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub >-
+        topicMoneyMovementAccount${StudentName}
+  
+  QueueMoneyMovementAccount: 
+    Type: AWS::SQS::Queue
+    DependsOn:
+      - DlqQueueMoneyMovementAccount
+    Properties: 
+      QueueName: !Sub >-
+        queueMoneyMovementAccount${StudentName}
+      VisibilityTimeout: 120
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DlqQueueMoneyMovementAccount.Arn
+        maxReceiveCount: 3
+  
+  DlqQueueMoneyMovementAccount:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub >-
+        queueMoneyMovementAccount${StudentName}DLQ
+      VisibilityTimeout: 120
+  
+  QueuePolicyQueueMoneyMovementAccount:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref QueueMoneyMovementAccount
+      PolicyDocument:
+        Id: AllowIncomingAccess
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Ref AWS::AccountId
+            Action:
+              - sqs:SendMessage
+              - sqs:ReceiveMessage
+            Resource:
+              - !GetAtt QueueMoneyMovementAccount.Arn
+          -
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - sqs:SendMessage
+            Resource:
+              - !GetAtt QueueMoneyMovementAccount.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref TopicMoneyMovementAccount
+ 
+  SubscriptionQueueMoneyMovementAccount:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref TopicMoneyMovementAccount
+      Endpoint: !GetAtt 
+        - QueueMoneyMovementAccount
+        - Arn
+      Protocol: sqs
+      RawMessageDelivery: 'true'
+
+  FunctionEffectiveMovementEvent:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: effective-compensate-event/
+      Handler: app.lambdaHandler
+      Runtime: nodejs16.x
+      Architectures:
+        - x86_64
+      Role: !GetAtt ExecutionRoleDefaultLambda.Arn
+      Events:
+        Function:
+          Type: SQS # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            BatchSize: 5
+            Enabled: true
+            MaximumBatchingWindowInSeconds: 5
+            Queue: !GetAtt QueueMoneyMovementAccount.Arn
+      Environment:
+        Variables:
+          TABLE_TRANSFER: !Ref TableTransfer
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true # Enabling source maps will create the required NODE_OPTIONS environment variables on your lambda function during sam build
+        EntryPoints: 
+        - app.ts
+        External:
+          - "aws-sdk"
+Outputs:
+  TransferApi:
+    Description: "API Gateway endpoint URL for Prod stage for Transfer API"
+    Value: !Join ["", ["https://", !Ref ApiGateway, ".execute-api.", !Ref "AWS::Region", ".amazonaws.com"]]
+  
+  FunctionTransferApi:
+    Description: "ARN of Transfer API"
+    Value: !GetAtt FunctionTransferApi.Arn
+
+  TableTransfer:
+    Description: "ARN of TableTransfer"
+    Value: !GetAtt TableTransfer.Arn
+
+  TopicTransferMovements:
+    Description: "ARN of TopicTransferMovements"
+    Value: !Ref TopicTransferMovements
+  
+  QueueTransferMovementAccount:
+    Description: "ARN of QueueTransferMovementAccount"
+    Value: !GetAtt QueueTransferMovementAccount.Arn
+
+  TableAccountBalance:
+    Description: "ARN of TableAccountBalance"
+    Value: !GetAtt TableAccountBalance.Arn
+
+  FunctionAccountMovementEvent:
+    Description: "ARN of FunctionAccountMovementEvent"
+    Value: !GetAtt FunctionAccountMovementEvent.Arn
+
+  TopicMoneyMovementAccount:
+    Description: "ARN of TopicMoneyMovementAccount"
+    Value: !Ref TopicMoneyMovementAccount
+  
+  QueueMoneyMovementAccount:
+    Description: "ARN of QueueMoneyMovementAccount"
+    Value: !GetAtt QueueMoneyMovementAccount.Arn
+  
+  FunctionEffectiveMovementEvent:
+    Description: "ARN of FunctionEffectiveMovementEvent"
+    Value: !Ref FunctionEffectiveMovementEvent
+
+    
