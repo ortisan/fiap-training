@@ -15,10 +15,15 @@ export const handler = async (event: SQSEvent): Promise<PromiseSettledResult<voi
     const promises = event.Records.map(async (record: SQSRecord): Promise<void> => {
         try {
             console.log('Extracting data...');
+            
             const effectiveMovementEvent: EffectiveMovementEvent = JSON.parse(record.body);
             const executeStatementCommand: ExecuteStatementCommandInput = {
-                Statement: `UPDATE ${process.env.TABLE_TRANSFER}"  SET status=? where id=?`,
-                Parameters: [{ S: effectiveMovementEvent.status }, { S: effectiveMovementEvent.transferId }],
+                Statement: `UPDATE ${process.env.TABLE_TRANSFER} SET status=?, message=? where id=?`,
+                Parameters: [
+                    { S: effectiveMovementEvent.status },
+                    { S: effectiveMovementEvent.message },
+                    { S: effectiveMovementEvent.transferId },
+                ],
             };
             await dynamodbClient.executeStatement(executeStatementCommand);
             return;

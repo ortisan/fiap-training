@@ -111,7 +111,7 @@ export const lambdaHandler = middy(handler)
 const parseDynamoToDomain = (getItem: GetItemCommandOutput): AccountBalanceDomain => {
     const accountBalance: AccountBalanceDomain = {
         account: getItem!.Item!['id']!.S!,
-        amount: +getItem.Item!['ammount'].N!,
+        amount: +getItem.Item!['amount'].N!,
     };
     return accountBalance;
 };
