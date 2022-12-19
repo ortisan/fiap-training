@@ -8,7 +8,7 @@ Estamos desenvolvendo uma aplicação de transferência bancária que consiste e
 
 ![Arquitetura](images/hands-on.png)
 
-Ocorre que a squad atual que desenvolveu essa aplicação ganharam um bolão da Mega Sena e não trabalham mais no projeto. Você foi contratado para continuar o desenvolvimento e identificar possíveis problemas.
+Ocorre que a squad atual que desenvolveu essa aplicação ganhou um bolão da Mega Sena e não trabalham mais no projeto. Você foi contratado para continuar o desenvolvimento, identificar possíveis problemas e corrigí-los.
 
 ## Processo
 
@@ -23,14 +23,14 @@ Ocorre que a squad atual que desenvolveu essa aplicação ganharam um bolão da 
     sam build
     ```
 
-1. Faça o deploy da aplicação:
+1. Faça o deploy da aplicação. Siga o passo a passo:
     ```sh
     sam deploy --guided --capabilities CAPABILITY_NAMED_IAM
     ```
 
 ## Análise e Troubleshooting
 
-1. Análise de logs do sam, pois pode haver erros na configuração da aplicação e Cloudformation.
+1. Análise de logs do SAM, pois pode haver erros na configuração da aplicação e Cloudformation.
 
 1. Analise os logs CloudWatch. O CloudWatch Log insigts nos dá o detalhe dos logs da aplicação de forma que possamos identificar se ocorreu um erro no código. A aplicação está com uma quantidade razoável de logs.
 
@@ -39,3 +39,8 @@ Ocorre que a squad atual que desenvolveu essa aplicação ganharam um bolão da 
 1. Verifique os traces do X-Ray. X-Ray é o serviço da AWS que é responsável por fazer o trace da aplicação. Nos ajudará a identificar em qual ponto da arquitetura, não há propagação de eventos. Indicará que aquela peça está com problema, ou que os dados estão incorretos.
 
     ![Logs](images/x-ray.png)
+
+
+## Testes
+
+Para os testes das APIs, utilize a [collection Postman](https://github.com/ortisan/fiap-training/blob/main/aulas/troubleshootings/postman-collection.zip)
