@@ -1,5 +1,10 @@
 import { Tracer, captureLambdaHandler } from '@aws-lambda-powertools/tracer';
-import { DynamoDB, GetItemCommandInput, GetItemCommandOutput, PutItemCommandInput } from '@aws-sdk/client-dynamodb';
+import {
+    DynamoDB,
+    ExecuteStatementCommandInput,
+    GetItemCommandInput,
+    GetItemCommandOutput,
+} from '@aws-sdk/client-dynamodb';
 import { PublishCommandInput, SNS } from '@aws-sdk/client-sns';
 import middy from '@middy/core';
 import sqsPartialBatchFailure from '@middy/sqs-partial-batch-failure';
@@ -58,7 +63,7 @@ export const handler = async (event: SQSEvent): Promise<PromiseSettledResult<voi
             let accountToBalance = parseDynamoToDomain(accountToBalanceDbItem);
 
             accountFromBalance = addBalance(accountFromBalance, transferDomain.amount * -1);
-            accountToBalance = addBalance(accountFromBalance, transferDomain.amount);
+            accountToBalance = addBalance(accountToBalance, transferDomain.amount);
 
             if (accountFromBalance.amount < 0) {
                 const effectiveMovementEvent: EffectiveMovementEvent = {
@@ -78,8 +83,8 @@ export const handler = async (event: SQSEvent): Promise<PromiseSettledResult<voi
                 return;
             }
 
-            await dynamodbClient.putItem(getPutItemCommand(accountFromBalance));
-            await dynamodbClient.putItem(getPutItemCommand(accountToBalance));
+            await dynamodbClient.executeStatement(getUpdateStatementCommand(accountFromBalance));
+            await dynamodbClient.executeStatement(getUpdateStatementCommand(accountToBalance));
 
             const effectiveMovementEvent: EffectiveMovementEvent = {
                 transferId: transferDomain.id,
@@ -105,8 +110,8 @@ export const handler = async (event: SQSEvent): Promise<PromiseSettledResult<voi
 // Wrap the handler with middy
 export const lambdaHandler = middy(handler)
     // Use the middleware by passing the Tracer instance as a parameter
-    .use(captureLambdaHandler(tracer))
-    .use(sqsPartialBatchFailure());
+    .use(sqsPartialBatchFailure())
+    .use(captureLambdaHandler(tracer));
 
 const parseDynamoToDomain = (getItem: GetItemCommandOutput): AccountBalanceDomain => {
     const accountBalance: AccountBalanceDomain = {
@@ -120,18 +125,10 @@ const addBalance = (accountBalance: AccountBalanceDomain, amountToAdd: number): 
     return { ...accountBalance, amount: accountBalance.amount + amountToAdd };
 };
 
-const getPutItemCommand = (accountBalance: AccountBalanceDomain) => {
-    const putItemCommand: PutItemCommandInput = {
-        TableName: process.env.TABLE_ACCOUNT_BALANCE!,
-        ReturnConsumedCapacity: 'TOTAL',
-        Item: {
-            id: {
-                S: accountBalance.account,
-            },
-            amount: {
-                N: String(accountBalance.amount),
-            },
-        },
+const getUpdateStatementCommand = (accountBalance: AccountBalanceDomain): ExecuteStatementCommandInput => {
+    const executeStatementCommand: ExecuteStatementCommandInput = {
+        Statement: `UPDATE ${process.env.TABLE_ACCOUNT_BALANCE} SET amount=? where id=?`,
+        Parameters: [{ N: String(accountBalance.amount) }, { S: accountBalance.account }],
     };
-    return putItemCommand;
+    return executeStatementCommand;
 };

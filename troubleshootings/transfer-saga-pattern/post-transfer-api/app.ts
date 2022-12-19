@@ -16,7 +16,7 @@ const awsRegion = 'us-east-1';
 const dynamodbClient = new DynamoDB({ region: awsRegion });
 const snsClient = new SNS({ region: awsRegion });
 
-const tracer = new Tracer({ serviceName: process.env.SERVICE_NAME });
+const tracer = new Tracer({ serviceName: process.env.SERVICE_NAME, enabled: true });
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     console.log('Received event', JSON.stringify(event));

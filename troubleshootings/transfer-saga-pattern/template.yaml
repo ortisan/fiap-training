@@ -10,7 +10,7 @@ Globals:
     Tracing: Active
   Api:
     OpenApiVersion: 3.0.1 # https://github.com/aws/serverless-application-model/issues/191
-    TracingEnabled: True
+    TracingEnabled: true
 
 Parameters:
   StudentName: 

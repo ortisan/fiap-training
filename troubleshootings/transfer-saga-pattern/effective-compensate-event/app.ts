@@ -7,7 +7,7 @@ import { EffectiveMovementEvent, errorHandler } from './commons';
 const awsRegion = 'us-east-1';
 const dynamodbClient = new DynamoDB({ region: awsRegion });
 
-const tracer = new Tracer({ serviceName: process.env.SERVICE_NAME });
+const tracer = new Tracer({ serviceName: process.env.SERVICE_NAME, enabled: true });
 
 export const handler = async (event: SQSEvent): Promise<PromiseSettledResult<void>[]> => {
     console.log('Event received', JSON.stringify(event));
@@ -15,7 +15,7 @@ export const handler = async (event: SQSEvent): Promise<PromiseSettledResult<voi
     const promises = event.Records.map(async (record: SQSRecord): Promise<void> => {
         try {
             console.log('Extracting data...');
-            
+
             const effectiveMovementEvent: EffectiveMovementEvent = JSON.parse(record.body);
             const executeStatementCommand: ExecuteStatementCommandInput = {
                 Statement: `UPDATE ${process.env.TABLE_TRANSFER} SET status=?, message=? where id=?`,
@@ -38,5 +38,5 @@ export const handler = async (event: SQSEvent): Promise<PromiseSettledResult<voi
 // Wrap the handler with middy
 export const lambdaHandler = middy(handler)
     // Use the middleware by passing the Tracer instance as a parameter
-    .use(captureLambdaHandler(tracer))
-    .use(sqsPartialBatchFailure());
+    .use(sqsPartialBatchFailure())
+    .use(captureLambdaHandler(tracer));
