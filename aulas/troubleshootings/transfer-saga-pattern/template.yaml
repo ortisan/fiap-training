@@ -15,7 +15,7 @@ Globals:
 Parameters:
   StudentName: 
     Type: String
-    Default: Marcelo
+    Default: Marceloortiz
 
 Resources:
   ApiGateway:
@@ -26,7 +26,8 @@ Resources:
   ExecutionRoleDefaultLambda:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: lambda-execution-role-transfer
+      RoleName: !Sub >-
+            lambda-execution-role-transfer-${StudentName}
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -38,13 +39,6 @@ Resources:
               - sts:AssumeRole
       Path: /
       Policies:
-        - PolicyName: root
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action: '*'
-                Resource: '*'
         - PolicyName: logs
           PolicyDocument:
             Version: '2012-10-17'
@@ -80,7 +74,7 @@ Resources:
             Statement:
             - Effect: Allow
               Action:
-              - dynamodb:PutItem
+              - dynamodb:PutItem123
               - dynamodb:GetRecords
               - dynamodb:GetShardIterator
               - dynamodb:DescribeStream
@@ -359,12 +353,13 @@ Resources:
             BatchSize: 5
             Enabled: true
             MaximumBatchingWindowInSeconds: 5
-            Queue: !GetAtt QueueTransferMovementAccount.Arn
+            #Queue: !GetAtt QueueTransferMovementAccount.Arn
+            Queue: !GetAtt QueueMoneyMovementAccount.Arn
       Environment:
         Variables:
           SERVICE_NAME: !Sub >-
             transfer${StudentName}
-          TABLE_ACCOUNT_BALANCE: !Ref TableAccountBalance 
+          #TABLE_ACCOUNT_BALANCE: !Ref TableAccountBalance 
           TOPIC_MONEY_MOVEMENT_ACCOUNT: !Ref TopicMoneyMovementAccount 
     Metadata: # Manage esbuild properties
       BuildMethod: esbuild

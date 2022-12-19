@@ -21,6 +21,10 @@ const tracer = new Tracer({ serviceName: process.env.SERVICE_NAME, enabled: true
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     console.log('Received event', JSON.stringify(event));
 
+    if (true) {
+        throw Error("Erro geral...");
+    }
+
     try {
         const data: TransferRequest = JSON.parse(event.body || '');
 
@@ -93,6 +97,7 @@ export const lambdaHandler = middy(handler)
     .use(captureLambdaHandler(tracer));
 
 const validate = (domain: TransferDomain) => {
+    
     const errors = [];
     if (!domain.accountFrom) {
         errors.push('From Account is required.');
